@@ -13,6 +13,14 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import pymysql
 pymysql.install_as_MySQLdb()
+import os
+
+# Add this line to your settings.py
+GDAL_LIBRARY_PATH = r'C:\OSGeo4W\bin\gdal310.dll'
+GEOS_LIBRARY_PATH = r'C:\OSGeo4W\bin\geos_c.dll'
+
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -39,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.gis',
         # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
@@ -48,6 +57,7 @@ INSTALLED_APPS = [
     'management',
     'core',
 ]
+
 AUTH_USER_MODEL = 'management.CustomUser'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -61,10 +71,13 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'attendx.urls'
 
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            os.path.join(BASE_DIR, 'templates'),  # Points to the 'templates' folder at the root level
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -76,6 +89,7 @@ TEMPLATES = [
         },
     },
 ]
+
 
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
@@ -103,7 +117,7 @@ WSGI_APPLICATION = 'attendx.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'django.contrib.gis.db.backends.mysql',  # GIS-enabled MySQL backend
         'NAME': 'new_attendx',
         'USER': 'kanik-snippet',
         'PASSWORD': 'Snippet@1',

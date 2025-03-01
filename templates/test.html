@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>QR Code Test</title>
+</head>
+<body>
+    <h2>QR Code:</h2>
+    <img id="qrImage" src="" alt="QR Code">
+    <p id="expiry"></p>
+
+    <script>
+        async function loadQRCode() {
+            const response = await fetch("http://127.0.0.1:8000/api/auth/generate-qr/");
+            const data = await response.json();
+            
+            document.getElementById("qrImage").src = "data:image/png;base64," + data.qr_code;
+            document.getElementById("expiry").innerText = "Expires at: " + data.expires_at;
+        }
+
+        loadQRCode();
+        setInterval(loadQRCode, 10000); // Har 10 sec me refresh
+    </script>
+</body>
+</html>

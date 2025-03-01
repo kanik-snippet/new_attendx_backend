@@ -1,3 +1,9 @@
+import qrcode
+from io import BytesIO
+import base64
+from datetime import datetime, timedelta
+from django.http import JsonResponse
+from django.utils.timezone import now
 from .models import *
 from .permissions import IsSuperAdmin,IsSuperAdminOrSubAdmin  # ✅ Importing Custom Permission
 from .serializers import *
@@ -476,3 +482,194 @@ class DeleteSubjectAPIView(generics.DestroyAPIView):
     )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
+
+class CreateSectionAPIView(generics.CreateAPIView):
+    queryset = Section.objects.all()
+    serializer_class = SectionSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdminOrSubAdmin]
+
+    @swagger_auto_schema(
+        operation_description="Sub Admin can create sections",
+        manual_parameters=[token_param],
+        responses={201: SectionSerializer, 400: "Bad Request"}
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+class ListSectionsAPIView(generics.ListAPIView):
+    queryset = Section.objects.all()
+    serializer_class = SectionSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdminOrSubAdmin]
+
+    @swagger_auto_schema(
+        operation_description="Sub Admin can list all sections",
+        manual_parameters=[token_param],
+        responses={200: SectionSerializer(many=True)}
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+class RetrieveSectionAPIView(generics.RetrieveAPIView):
+    queryset = Section.objects.all()
+    serializer_class = SectionSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdminOrSubAdmin]
+
+    @swagger_auto_schema(
+        operation_description="Sub Admin can retrieve a specific section",
+        manual_parameters=[token_param],
+        responses={200: SectionSerializer}
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+class UpdateSectionAPIView(generics.UpdateAPIView):
+    queryset = Section.objects.all()
+    serializer_class = SectionSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdminOrSubAdmin]
+
+    @swagger_auto_schema(
+        operation_description="Sub Admin can update section details",
+        manual_parameters=[token_param],
+        responses={200: SectionSerializer, 400: "Bad Request"}
+    )
+    def put(self, request, *args, **kwargs):
+        return super().put(request, *args, **kwargs)
+
+class DeleteSectionAPIView(generics.DestroyAPIView):
+    queryset = Section.objects.all()
+    permission_classes = [IsAuthenticated, IsSuperAdminOrSubAdmin]
+
+    @swagger_auto_schema(
+        operation_description="Sub Admin can delete a section",
+        manual_parameters=[token_param],
+        responses={204: "Section deleted successfully"}
+    )
+    def delete(self, request, *args, **kwargs):
+        return super().delete(request, *args, **kwargs)
+
+import qrcode
+import base64
+import json
+from io import BytesIO
+from django.utils.timezone import now
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from .models import Lecture
+
+def generate_qr(request, lecture_id):
+    # Lecture Fetch Karo
+    lecture = get_object_or_404(Lecture, id=lecture_id)
+
+    # QR Code Expiry Time (5 min)
+    expiry_time = now() + timedelta(minutes=5)
+    lecture.qr_expiry = expiry_time
+    lecture.save()
+
+    # QR Code Data (Lecture ID + Expiry)
+    qr_data = json.dumps({"lecture_id": lecture.id, "expires_at": expiry_time.isoformat()})
+    
+    # QR Code Generate
+    qr = qrcode.make(qr_data)
+    buffer = BytesIO()
+    qr.save(buffer, format="PNG")
+    qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+    return JsonResponse({"qr_code": qr_base64, "expires_at": expiry_time})
+
+import json
+import base64
+from django.utils.timezone import now
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.gis.geos import Point
+from django.contrib.gis.measure import D
+from django.shortcuts import get_object_or_404
+from .models import Attendance, AttendanceRecord, Lecture
+
+@csrf_exempt
+def mark_attendance(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            # Student se QR Code + Location lo
+            qr_data = data.get("qr_data")
+            student_lat = float(data.get("latitude", 0))
+            student_lon = float(data.get("longitude", 0))
+
+            # QR Code decode karo
+            decoded_data = base64.b64decode(qr_data).decode("utf-8")
+            qr_json = json.loads(decoded_data)
+
+            # Lecture ID & expiry check karo
+            lecture_id = qr_json.get("lecture_id")
+            expires_at = qr_json.get("expires_at")
+
+            if now().isoformat() > expires_at:
+                return JsonResponse({"message": "QR Code expired!"}, status=400)
+
+            # Lecture fetch karo
+            lecture = get_object_or_404(Lecture, id=lecture_id)
+
+            # Teacher aur Student location compare karo
+            teacher_location = Point(lecture.location.x, lecture.location.y, srid=4326)
+            student_location = Point(student_lat, student_lon, srid=4326)
+
+            if teacher_location.distance(student_location) > D(m=50):
+                status = "proxy"
+            else:
+                status = "present"
+
+            # Attendance Record Save Karo
+            attendance, created = Attendance.objects.get_or_create(lecture=lecture, defaults={"status": "open"})
+            AttendanceRecord.objects.create(attendance=attendance, student=request.user, status=status)
+
+            return JsonResponse({"message": "Attendance marked!", "status": status})
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"message": "Invalid request method"}, status=400)
+
+from django.utils.timezone import now
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.gis.geos import Point
+import json
+from .models import Lecture
+
+@csrf_exempt
+def create_lecture(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            # Teacher, Course, Department, Section, Location lo
+            teacher = request.user
+            course_id = data.get("course_id")
+            department_id = data.get("department_id")
+            section_id = data.get("section_id")
+            teacher_lat = float(data.get("latitude", 0))
+            teacher_lon = float(data.get("longitude", 0))
+
+            # Start Time Abhi Ka Set Karo
+            start_time = now()
+
+            # Lecture Create Karo
+            lecture = Lecture.objects.create(
+                teacher=teacher,
+                course_id=course_id,
+                department_id=department_id,
+                section_id=section_id,
+                start_time=start_time,
+                location=Point(teacher_lat, teacher_lon, srid=4326),
+                status="open"
+            )
+
+            return JsonResponse({"message": "Lecture created!", "lecture_id": lecture.id})
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"message": "Invalid request method"}, status=400)
+

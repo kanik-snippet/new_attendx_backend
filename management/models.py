@@ -1,5 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.contrib.gis.db import models as gis_models  # For location validation
+from django.conf import settings
 
 # College Model
 class College(models.Model):
@@ -92,8 +94,43 @@ class Teacher(models.Model):
     def __str__(self):
         return f"{self.name} ({self.employee_id}) - {self.department.name}"
 
+class Lecture(models.Model):
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    section = models.ForeignKey(Section, on_delete=models.CASCADE)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    qr_expiry = models.DateTimeField()
+    location = gis_models.PointField(null=True, blank=True)  # Stores teacher's location
+    status = models.CharField(max_length=20, choices=[("open", "Open"), ("submitted", "Submitted")], default="open")
 
+    def __str__(self):
+        return f"{self.course.name} - {self.section.name} - {self.start_time.strftime('%Y-%m-%d %H:%M')}"
 
+    
+class Attendance(models.Model):
+    lecture = models.ForeignKey(Lecture, on_delete=models.CASCADE)  # Added Lecture referencQ   e
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    section = models.ForeignKey(Section, on_delete=models.CASCADE)
+    date = models.DateTimeField(auto_now_add=True)
+    qr_code = models.ImageField(upload_to='qr_codes/', null=True, blank=True)
+    qr_expiry = models.DateTimeField()
+    location = gis_models.PointField(null=True, blank=True)  # Stores teacher's location
+    status = models.CharField(max_length=20, choices=[("open", "Open"), ("submitted", "Submitted")], default="open")
+
+    def __str__(self):
+        return f"{self.teacher.name} - {self.course.name} - {self.lecture} - {self.status} - {self.date.date()}"
+
+class AttendanceRecord(models.Model):
+    attendance = models.ForeignKey(Attendance, on_delete=models.CASCADE, related_name="records")
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, choices=[("present", "Present"), ("absent", "Absent"), ("proxy", "Proxy")])
+
+    def __str__(self):
+        return f"{self.student.name} - {self.status}"
 
 
     

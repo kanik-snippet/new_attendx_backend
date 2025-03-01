@@ -83,7 +83,10 @@ class DepartmentSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 class SectionSerializer(serializers.ModelSerializer):
+    department_name = serializers.ReadOnlyField(source="department.name")
+
     class Meta:
         model = Section
-        fields = "__all__"
+        fields = ["id", "name", "department", "department_name"]
+
 

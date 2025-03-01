@@ -2,6 +2,14 @@ from django.urls import path
 from .views import *
 
 urlpatterns = [
+    path("generate-qr/", generate_qr, name="generate_qr"),
+    path("mark-attendance/", mark_attendance, name="mark_attendance"),
+    path('create-lecture/',create_lecture,name='create-lecture'),
+
+
+
+
+
     path('login/', LoginAPIView.as_view(), name='login'),
     path('colleges/create/', CreateCollegeAPIView.as_view(), name='create-college'),
     path('colleges/', ListCollegesAPIView.as_view(), name='list-colleges'),
@@ -47,4 +55,11 @@ urlpatterns = [
     path('subjects/<int:pk>/', RetrieveSubjectAPIView.as_view(), name="retrieve_subject"),
     path('subjects/<int:pk>/update/', UpdateSubjectAPIView.as_view(), name="update_subject"),
     path('subjects/<int:pk>/delete/', DeleteSubjectAPIView.as_view(), name="delete_subject"),
+ 
+    # ✅ Sub Admin: Section Management
+    path('sections/create/', CreateSectionAPIView.as_view(), name='create-section'),
+    path('sections/', ListSectionsAPIView.as_view(), name='list-sections'),
+    path('sections/<int:pk>/', RetrieveSectionAPIView.as_view(), name='retrieve-section'),
+    path('sections/<int:pk>/update/', UpdateSectionAPIView.as_view(), name='update-section'),
+    path('sections/<int:pk>/delete/', DeleteSectionAPIView.as_view(), name='delete-section'),
 ]
